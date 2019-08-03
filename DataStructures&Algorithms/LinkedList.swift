@@ -8,11 +8,30 @@
 
 import Foundation
 
-struct LinkedList<T> {
+final class Node<T> {
     
+    // Здесь мы будем хранить значение нашего контейнера
+    let value: T
+    
+    // Эти свойства используем для хранения связей между контейнерами
+    // Если кто-то может сделать что-то неправильно, то он обязательно сделает!
+    // закроем доступ к сеттерам наших связей между контейнерами извне
+    fileprivate(set) var next: Node?
+    fileprivate(set) weak var previous: Node?
+    
+    init(value: T, next: Node? = nil, previous: Node? = nil) {
+        self.value = value
+        self.next = next
+        self.previous = previous
+    }
+}
+
+struct LinkedList<T> {
+    // Уникальный id нашего списка.
+    private var uniqueReference = UniqueReference()
     // хранить в списке мы будем только ссылки на первый и последний контейнеры
-    private var firstNode: Node<T>?
-    private var lastNode: Node<T>?
+    fileprivate(set) var firstNode: Node<T>?
+    fileprivate(set) var lastNode: Node<T>?
     
     // Cвойства для доступа к контейнерам извне. Я использую слабые ссылки, чтобы никто не увеличил счетчик.
     // Могут возникнуть проблемы с ARC и copy-on-write
@@ -28,33 +47,10 @@ struct LinkedList<T> {
         return first == nil
     }
     
-    // Как несложно было догадаться, метод отвечает за создание копии списка,
-    // если в нем произошли изменения
-    private mutating func copyIfNeeded() {
-        // Проверим количество сильных ссылок на наш список.
-        // Копирование необходимо только, если сильных ссылок больше одной
-        guard !isKnownUniquelyReferenced(&firstNode),
-            // сохраним первый контейнер исходного списка
-            var previous = firstNode else { return }
-        // Создаем новый контейнер и помещаем в него значение первого контейнера исходного списка
-        // Тепер это наш новый перый контейнер
-        firstNode = Node(value: previous.value)
-        // Используем current для итерации по новому списку, а previous по старому
-        var current = firstNode
-        // Пройдемся по всем контейнерам в списке
-        while let next = previous.next {
-            // в каждой итерации мы создаем новый контейнер и копируем в него значение из исходного списка
-            current?.next = Node(value: next.value, previous: current)
-            // После просто сдвигаем элементы в списках на один шаг вперед
-            current = current?.next
-            previous = next
-        }
-        // в завершении остается присвоить last элементу получившегося списка current-контейнер
-        lastNode = current
-    }
+    // MARK: - Методы наполнения списка
     
     /// Вставка значения в начало списка
-    /// - Complexity: O(1)
+    /// - Complexity: O(1) без копирования, с копированием O(n)
     mutating func insertFirst(_ value: T) {
         copyIfNeeded()
         // создаем новый контейнер и передаем ему текущий первый контейнер списка как next
@@ -71,7 +67,7 @@ struct LinkedList<T> {
     }
     
     /// Вставка значения в конец списка
-    /// - Complexity: O(1)
+    /// - Complexity: O(1) без копирования, с копированием O(n)
     mutating func append(_ value: T) {
         copyIfNeeded()
         // первым делом проверяем не пуст ли наш список
@@ -87,7 +83,7 @@ struct LinkedList<T> {
     }
     
     /// Вставка значения после заданного контейнера
-    /// - Complexity: O(1)
+    /// - Complexity: O(1) без копирования, с копированием O(n)
     mutating func insert(_ value: T, after referenced: WeakReference<Node<T>>) {
         copyIfNeeded()
         // проверяем не ссылается ли наш последний элемент списка на контейнер, переданный в параметре
@@ -104,8 +100,10 @@ struct LinkedList<T> {
         referenced.node?.next = newNode
     }
     
+    // MARK: - Методы удаления из списка
+    
     /// Удаление первого значения в списке
-    /// - Complexity: O(1)
+    /// - Complexity: O(1) без копирования, с копированием O(n)
     @discardableResult
     mutating func removeFirst() -> T? {
         copyIfNeeded()
@@ -125,7 +123,7 @@ struct LinkedList<T> {
     }
     
     /// Удаление последнего значения в списке
-    /// - Complexity: O(1)
+    /// - Complexity: O(1) без копирования, с копированием O(n)
     @discardableResult
     mutating func removeLast() -> T? {
         copyIfNeeded()
@@ -148,7 +146,7 @@ struct LinkedList<T> {
     }
     
     /// Удаление значения после заданного контейнера
-    /// - Complexity: O(1)
+    /// - Complexity: O(1) без копирования, с копированием O(n)
     @discardableResult
     mutating func remove(after referenced: WeakReference<Node<T>>) -> T? {
         copyIfNeeded()
@@ -167,6 +165,8 @@ struct LinkedList<T> {
         return referenced.node?.next?.value
     }
 }
+
+// MARK: - BidirectionalCollection extension
 
 extension LinkedList: BidirectionalCollection {
     // В качестве индекса использовать Int крайне непрактично. Это погубит производительность
@@ -219,6 +219,40 @@ extension LinkedList: BidirectionalCollection {
     subscript(position: Index) -> T? {
         // не зря же мы прописали в структуре Index свойство node
         return position.node?.value
+    }
+}
+
+// MARK: - Copy-on-write реализация
+
+extension LinkedList {
+    // Воспользуемся советом из комментариев и не будем придумывать weak ссылок
+    // создадим класс, экземпляры которого будут служить нам идентификаторами уникальности
+    private class UniqueReference {}
+    // Как несложно было догадаться, метод отвечает за создание копии списка,
+    // если в нем произошли изменения
+    private mutating func copyIfNeeded() {
+        // Проверим количество сильных ссылок на наш список.
+        // Копирование необходимо только, если сильных ссылок больше одной
+        guard !isKnownUniquelyReferenced(&uniqueReference),
+            // сохраним первый контейнер исходного списка
+            var previous = firstNode else { return }
+        // Создаем новый контейнер и помещаем в него значение первого контейнера исходного списка
+        // Тепер это наш новый перый контейнер
+        firstNode = Node(value: previous.value)
+        // Используем current для итерации по новому списку, а previous по старому
+        var current = firstNode
+        // Пройдемся по всем контейнерам в списке
+        while let next = previous.next {
+            // в каждой итерации мы создаем новый контейнер и копируем в него значение из исходного списка
+            current?.next = Node(value: next.value, previous: current)
+            // После просто сдвигаем элементы в списках на один шаг вперед
+            current = current?.next
+            previous = next
+        }
+        // остается присвоить last элементу получившегося списка current-контейнер
+        lastNode = current
+        // и создать новый идентификатор, ведь он должен быть уникальным
+        uniqueReference = UniqueReference()
     }
 }
 
