@@ -9,13 +9,11 @@
 import Foundation
 
 final class Node<T> {
-    
     // Здесь мы будем хранить значение нашего контейнера
     let value: T
-    
     // Эти свойства используем для хранения связей между контейнерами
     // Если кто-то может сделать что-то неправильно, то он обязательно сделает!
-    // закроем доступ к сеттерам наших связей между контейнерами извне
+    // Закроем доступ к сеттерам наших связей между контейнерами извне
     fileprivate(set) var next: Node?
     fileprivate(set) weak var previous: Node?
     
@@ -33,8 +31,13 @@ struct LinkedList<T> {
     fileprivate(set) var firstNode: Node<T>?
     fileprivate(set) var lastNode: Node<T>?
     
-    // Cвойства для доступа к контейнерам извне. Я использую слабые ссылки, чтобы никто не увеличил счетчик.
-    // Могут возникнуть проблемы с ARC и copy-on-write
+    var isEmpty: Bool {
+        return firstNode == nil
+    }
+    
+    // Cвойства для доступа к контейнерам извне. Я использую слабые ссылки,
+    // потому что иначе вызов метода insert(value, after: linkedList.first!)
+    // ломает все реализации списков made by Super-Expert-Senior-iOS-Developer
     var first: WeakReference<Node<T>>? {
         return firstNode?.weakReference
     }
@@ -42,11 +45,7 @@ struct LinkedList<T> {
     var last: WeakReference<Node<T>>? {
         return lastNode?.weakReference
     }
-    
-    var isEmpty: Bool {
-        return first == nil
-    }
-    
+
     // MARK: - Методы наполнения списка
     
     /// Вставка значения в начало списка
@@ -174,7 +173,6 @@ extension LinkedList: BidirectionalCollection {
     struct Index: Comparable {
         // Контейнер, связанный с индексом. Иначе зачем нам вообще индекс?
         var node: Node<T>?
-        
         // Метод протокола Comparable. LinkedList<T>.Index как тип писать не обязательно, достаточно Index
         static func == (lhs: LinkedList<T>.Index, rhs: LinkedList<T>.Index) -> Bool {
             // Логика сравнения следующая: создаем кортеж с контейнерами, на которые указывают наши индексы.
@@ -185,7 +183,6 @@ extension LinkedList: BidirectionalCollection {
                 return left === right
             }
         }
-        
         // осталось реализовать обязательный метод "<"
         static func < (lhs: LinkedList<T>.Index, rhs: LinkedList<T>.Index) -> Bool {
             guard lhs != rhs else { return false }
@@ -258,7 +255,6 @@ extension LinkedList {
 
 // MARK: - Debug only
 extension LinkedList: CustomStringConvertible {
-    
     var description: String {
         return firstNode?.description ?? "Empty list"
     }

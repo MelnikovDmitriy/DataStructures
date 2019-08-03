@@ -55,3 +55,9 @@ let index = linkedList.index(linkedList.endIndex, offsetBy: -5)
 
 print(index.node!.value) // 4
 print("\n")
+
+let test = linkedList.first?.node
+linkedList.insert(666, after: linkedList.first!)
+
+print(linkedList) // 2 -> 666 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
+print("\n")

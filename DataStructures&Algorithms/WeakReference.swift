@@ -7,7 +7,8 @@
 //
 
 import Foundation
-// протоколы со связанными типами - это модно, молодёжно, но можно было и без них
+
+// Associated Types protocols - это модно, молодёжно, но можно было и без них
 protocol WeakReferencePotocol: AnyObject {
     associatedtype T
     // я реализую это свойство в классе Node, чтобы copy-on-write техника работала
@@ -15,11 +16,28 @@ protocol WeakReferencePotocol: AnyObject {
     var weakReference: WeakReference<Node<T>> { get }
 }
 // Обёртка, которая используется для хранения слабой ссылки на контейнер
-class WeakReference<T: AnyObject> {
+final class WeakReference<T: AnyObject> {
     // private(set) - это модификатор, чтобы свойство нельзя изменить извне
     private(set) weak var node: T?
     
     init(node: T?) {
         self.node = node
+    }
+}
+// Да простят меня адепты мантры "1 класс - 1 файл". Это просто демо проект, ребят
+extension Node: WeakReferencePotocol {
+    // Слабая ссылка нам пригодится, когда мы будем реализовывать copy-on-write
+    var weakReference: WeakReference<Node<T>> {
+        return WeakReference(node: self)
+    }
+}
+
+// MARK: - Debug only
+extension Node: CustomStringConvertible {
+    
+    var description: String {
+        
+        guard let next = next else { return "\(value)"}
+        return "\(value) -> \(next.description)"
     }
 }
